@@ -13,9 +13,7 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            steps {
-                checkout scm
-            }
+            steps { checkout scm }
         }
 
         stage('Lint') {
@@ -54,14 +52,43 @@ pipeline {
         stage('Docker Build') {
             steps {
                 sh 'docker build -t ${APP_NAME}:${BUILD_TAG} .'
-                sh 'docker images | grep ${APP_NAME}'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                sh """
+                    echo '🚀 Deploying ${APP_NAME}:${BUILD_TAG} to staging...'
+                    docker stop ${APP_NAME}-staging || true
+                    docker rm ${APP_NAME}-staging || true
+                    docker run -d --name ${APP_NAME}-staging -p 8081:8080 ${APP_NAME}:${BUILD_TAG}
+                    echo '✅ Staging is up at http://localhost:8081'
+                """
+            }
+        }
+
+        stage('Approval for Production') {
+            steps {
+                input message: 'Staging 已部署，确认发布到生产环境？', ok: '确认发布'
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                sh """
+                    echo '🚀 Deploying ${APP_NAME}:${BUILD_TAG} to PRODUCTION...'
+                    docker stop ${APP_NAME}-prod || true
+                    docker rm ${APP_NAME}-prod || true
+                    docker run -d --name ${APP_NAME}-prod -p 8082:8080 ${APP_NAME}:${BUILD_TAG}
+                    echo '✅ Production is up at http://localhost:8082'
+                """
             }
         }
     }
 
     post {
         success {
-            echo '✅ 构建成功：Lint + Test + Package + Docker Build 全部通过'
+            echo '🎉 全流程完成：代码检查 → 测试 → 打包 → 镜像 → 部署生产'
         }
         failure {
             echo '❌ 构建失败，请检查 Console Output'
