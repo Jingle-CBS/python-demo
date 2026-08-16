@@ -7,7 +7,7 @@ pipeline {
     }
 
     options {
-        timeout(time: 5, unit: 'MINUTES')
+        timeout(time: 10, unit: 'MINUTES')
         buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
@@ -15,7 +15,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                sh 'ls -la'
             }
         }
 
@@ -51,11 +50,18 @@ pipeline {
                 archiveArtifacts artifacts: "${APP_NAME}-${BUILD_TAG}.tar.gz", fingerprint: true
             }
         }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t ${APP_NAME}:${BUILD_TAG} .'
+                sh 'docker images | grep ${APP_NAME}'
+            }
+        }
     }
 
     post {
         success {
-            echo '✅ 构建成功：代码检查通过 + 测试通过 + 制品已归档'
+            echo '✅ 构建成功：Lint + Test + Package + Docker Build 全部通过'
         }
         failure {
             echo '❌ 构建失败，请检查 Console Output'
